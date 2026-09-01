@@ -156,7 +156,10 @@ public class HealthTests
         _go.AddComponent<DamageReduction>().Initialize(stats);
         Health health = CreateHealth(100f);
 
-        Assert.AreEqual(40f, health.TakeDamage(100f), "Снижение урона должно упираться в 60%");
+        // Допуск обязателен: потолок считается через float-арифметику и даёт
+        // 39.9999962 вместо ровных 40 — сравнение на точное равенство здесь
+        // проверяет представление float, а не правило потолка.
+        Assert.AreEqual(40f, health.TakeDamage(100f), 0.001f, "Снижение урона должно упираться в 60%");
     }
 
     private class TestAbsorber : MonoBehaviour, IDamageInterceptor
