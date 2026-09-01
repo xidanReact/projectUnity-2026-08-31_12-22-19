@@ -243,4 +243,35 @@ public static class UiFactory
         field.SetTextWithoutNotify(value);
         return field;
     }
+
+    /// <summary>
+    /// Вертикальный скролл. Маска на прозрачной картинке: она обязана оставаться
+    /// raycastTarget, иначе ScrollRect не увидит перетаскивание пальцем.
+    /// </summary>
+    public static ScrollRect CreateScrollView(string name, Transform parent, out RectTransform content)
+    {
+        Image viewport = CreateImage(name + "Viewport", parent, new Color(0f, 0f, 0f, 0f));
+        viewport.raycastTarget = true;
+
+        var mask = viewport.gameObject.AddComponent<Mask>();
+        mask.showMaskGraphic = false;
+
+        var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+
+        content = CreateRect(name + "Content", viewport.transform);
+        content.anchorMin = new Vector2(0.5f, 0f);
+        content.anchorMax = new Vector2(0.5f, 0f);
+        content.pivot = new Vector2(0.5f, 0f);
+        content.anchoredPosition = Vector2.zero;
+
+        scroll.content = content;
+        scroll.viewport = viewport.rectTransform;
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Elastic;
+        scroll.scrollSensitivity = 28f;
+        scroll.inertia = true;
+
+        return scroll;
+    }
 }

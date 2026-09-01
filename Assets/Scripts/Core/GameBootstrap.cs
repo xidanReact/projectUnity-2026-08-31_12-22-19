@@ -14,9 +14,6 @@ public class GameBootstrap : MonoBehaviour
     /// Ставится в false, если бутстрап уже положен в сцену руками.
     public static bool AutoBootEnabled = true;
 
-    [Tooltip("Аварийный откат на IMGUI-заглушку Фазы 1, если с uGUI что-то не так.")]
-    public bool useLegacyImguiHud;
-
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoBoot()
     {
@@ -59,26 +56,10 @@ public class GameBootstrap : MonoBehaviour
         Debug.Log($"[Meta] Файл прогресса: {store.FilePath}");
         meta.Initialize(store);
 
-        // Запуск узла кампании (BiomeRun, апгрейды, метапрогрессия) придёт
-        // вместе с AppFlow в задаче 11 — пока GameRunner ничего не запускает.
         runner.Initialize(pools, spawner, difficulty);
 
-        // Старый UI отключён вместе с GameHud/PrototypeHud (см. .cs.disabled):
-        // AwardRun, на который они опирались, исчез вместе с бесконечным
-        // забегом. Интерфейса не будет до задачи 11.
-        // if (useLegacyImguiHud)
-        // {
-        //     var legacy = gameObjectRoot.AddComponent<PrototypeHud>();
-        //     legacy.runner = runner;
-        //     legacy.spawner = spawner;
-        //     legacy.upgrades = upgrades;
-        //     legacy.meta = meta;
-        // }
-        // else
-        // {
-        //     var hud = gameObjectRoot.AddComponent<GameHud>();
-        //     hud.Initialize(runner, spawner, upgrades, meta);
-        // }
+        var app = gameObjectRoot.AddComponent<AppFlow>();
+        app.Initialize(runner, spawner, upgrades, meta);
     }
 
     private static void SetUpCamera()
