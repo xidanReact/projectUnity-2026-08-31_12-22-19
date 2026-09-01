@@ -41,7 +41,7 @@ public class JsonProgressStore : IProgressStore
         {
             if (!File.Exists(_path))
             {
-                return new PlayerProgress();
+                return ProgressMigration.Migrate(new PlayerProgress());
             }
 
             string json = File.ReadAllText(_path);
@@ -51,21 +51,16 @@ public class JsonProgressStore : IProgressStore
             if (progress == null)
             {
                 Debug.LogWarning($"[Meta] Файл прогресса пуст или повреждён: {_path}. Начинаем с чистого.");
-                return new PlayerProgress();
+                return ProgressMigration.Migrate(new PlayerProgress());
             }
 
-            if (progress.perks == null)
-            {
-                progress.perks = new System.Collections.Generic.List<PerkLevel>();
-            }
-
-            return progress;
+            return ProgressMigration.Migrate(progress);
         }
         catch (Exception e)
         {
             // Потерять прогресс молча хуже, чем начать заново с записью в лог.
             Debug.LogError($"[Meta] Не удалось прочитать прогресс ({_path}): {e.Message}. Начинаем с чистого.");
-            return new PlayerProgress();
+            return ProgressMigration.Migrate(new PlayerProgress());
         }
     }
 

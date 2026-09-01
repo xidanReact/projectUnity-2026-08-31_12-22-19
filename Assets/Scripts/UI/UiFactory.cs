@@ -158,4 +158,89 @@ public static class UiFactory
 
         return fill;
     }
+
+    /// <summary>Растянуть элемент по всему родителю.</summary>
+    public static RectTransform Stretch(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        return rect;
+    }
+
+    public static RectTransform StretchWithPadding(RectTransform rect, float horizontal, float vertical)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = new Vector2(horizontal, vertical);
+        rect.offsetMax = new Vector2(-horizontal, -vertical);
+        return rect;
+    }
+
+    /// <summary>Элемент, прибитый к нижнему краю. Нужен таб-бару и кнопкам действий.</summary>
+    public static RectTransform BottomAnchored(RectTransform rect, float y, float width, float height)
+    {
+        rect.anchorMin = new Vector2(0.5f, 0f);
+        rect.anchorMax = new Vector2(0.5f, 0f);
+        rect.pivot = new Vector2(0.5f, 0f);
+        rect.anchoredPosition = new Vector2(0f, y);
+        rect.sizeDelta = new Vector2(width, height);
+        return rect;
+    }
+
+    /// <summary>
+    /// Слайдер без ручки: на телефоне полоса заполнения читается лучше, чем
+    /// мелкий кружок, и по ней можно попасть пальцем не целясь.
+    /// </summary>
+    public static Slider CreateSlider(string name, Transform parent, float value, Color fillColor)
+    {
+        Image background = CreateImage(name + "Background", parent, new Color(0f, 0f, 0f, 0.55f));
+        var slider = background.gameObject.AddComponent<Slider>();
+
+        RectTransform fillArea = CreateRect(name + "FillArea", background.transform);
+        fillArea.anchorMin = Vector2.zero;
+        fillArea.anchorMax = Vector2.one;
+        fillArea.offsetMin = new Vector2(4f, 4f);
+        fillArea.offsetMax = new Vector2(-4f, -4f);
+
+        Image fill = CreateImage(name + "Fill", fillArea, fillColor);
+        Stretch(fill.rectTransform);
+
+        slider.fillRect = fill.rectTransform;
+        slider.targetGraphic = background;
+        slider.direction = Slider.Direction.LeftToRight;
+        slider.minValue = 0f;
+        slider.maxValue = 1f;
+        slider.SetValueWithoutNotify(value);
+        return slider;
+    }
+
+    /// <summary>
+    /// Поле ввода на legacy InputField — по той же причине, что и весь текст:
+    /// TMP_InputField тянет за собой импорт TMP Essentials.
+    /// </summary>
+    public static InputField CreateInputField(string name, Transform parent, string value, string placeholder)
+    {
+        Image background = CreateImage(name + "Background", parent, new Color(0.92f, 0.93f, 0.96f));
+        var field = background.gameObject.AddComponent<InputField>();
+
+        Text text = CreateText(name + "Text", background.transform, value, 24, TextAnchor.MiddleLeft);
+        text.color = new Color(0.06f, 0.06f, 0.08f);
+        text.supportRichText = false;
+        StretchWithPadding(text.rectTransform, 14f, 6f);
+
+        Text hint = CreateText(name + "Placeholder", background.transform, placeholder, 24, TextAnchor.MiddleLeft);
+        hint.color = new Color(0.40f, 0.40f, 0.45f);
+        hint.fontStyle = FontStyle.Italic;
+        StretchWithPadding(hint.rectTransform, 14f, 6f);
+
+        field.textComponent = text;
+        field.placeholder = hint;
+        field.targetGraphic = background;
+        field.characterLimit = 16;
+        field.lineType = InputField.LineType.SingleLine;
+        field.SetTextWithoutNotify(value);
+        return field;
+    }
 }

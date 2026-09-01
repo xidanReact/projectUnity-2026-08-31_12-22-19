@@ -8,17 +8,32 @@ using System.Collections.Generic;
 [Serializable]
 public class PlayerProgress
 {
-    /// Версия схемы. Пригодится, когда формат изменится и старые сейвы надо будет мигрировать.
-    public int version = 1;
+    /// Версия схемы. Старые сейвы поднимает ProgressMigration при загрузке.
+    public int version = ProgressMigration.CurrentVersion;
 
-    /// Мягкая валюта — «биомасса».
+    /// Мягкая валюта — «биомасса». Тратится на перманентные улучшения.
     public int biomass;
+
+    /// Валюта косметики. Капает с узлов кампании вместе с биомассой.
+    public int gold;
+
+    public GameSettings settings = new GameSettings();
+
+    /// Имя значения PathogenType, показываемое на главном экране. Строкой,
+    /// а не индексом: перестановка значений enum не должна ломать сейвы.
+    public string lastPathogen = "Virus";
+
+    public CampaignProgress campaign = new CampaignProgress();
 
     /// Уровни перманентных улучшений.
     public List<PerkLevel> perks = new List<PerkLevel>();
 
     // --- Статистика для экрана результатов ---
     public int totalRuns;
+
+    /// Осталось от бесконечного забега и больше не обновляется: «дальше всех
+    /// пройденный уровень» перестало быть определено вместе с самим забегом.
+    /// Поле сохранено ради миграции; прогресс читается из campaign.nodes.
     public int bestLevelReached;
     public int totalKills;
     public int bossesDefeated;

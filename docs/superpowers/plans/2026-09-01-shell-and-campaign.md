@@ -46,8 +46,7 @@ System, NUnit EditMode-тесты, сборки `Pathogen.Runtime` / `Pathogen.E
 **Из командной строки** (Unity должен быть закрыт — иначе проект залочен):
 
 ```powershell
-& "C:\Program Files\Unity\Hub\Editor\6000.5.10f1\Editor\Unity.exe" -batchmode -quit `
-  -runTests -projectPath "E:\projectUnity\My project" -testPlatform EditMode `
+& "C:\Program Files\Unity\Hub\Editor\6000.5.10f1\Editor\Unity.exe" -batchmode -runTests -projectPath "E:\projectUnity\My project" -testPlatform EditMode `
   -testResults "E:\projectUnity\My project\Logs\test-results.xml" -logFile -
 ```
 
@@ -1446,14 +1445,24 @@ public class CampaignRulesTests
     }
 
     [Test]
-    public void ApplyClear_НеПадаетНаБоссеПоследнегоБиома()
+    public void ApplyClear_НеОткрываетНичегоЗаПределамиПоследнегоБиома()
     {
-        var progress = new CampaignProgress();
-        progress.UnlockBiome(CampaignBuilder.MarrowId);
+        // У последнего биома нет следующего — ApplyClear обязан это пережить.
         BiomeData last = _map.Biomes[_map.Biomes.Count - 1];
+        var node = new CampaignNode("b3_boss", "Финальный босс",
+            _map.FindNode("b1_boss").Level, 0, UnityEngine.Vector2.zero, 10, 10);
 
-        Assert.AreEqual(0, last.Nodes.Count, "Заглушка биома пуста — открывать нечего");
-        Assert.DoesNotThrow(() => CampaignRules.EnsureFirstBiomeUnlocked(progress));
+        Assert.AreEqual(0, last.Nodes.Count, "Заглушка биома пуста — узлов в ней нет");
+        Assert.DoesNotThrow(() => CampaignRules.ApplyClear(_map, _progress, node, 3),
+            "Узел вне карты не должен ронять запись результата");
+    }
+
+    [Test]
+    public void ApplyClear_ИгнорируетПровал()
+    {
+        CampaignRules.ApplyClear(_map, _progress, _map.FindNode("b1_n1"), 0);
+
+        Assert.AreEqual(0, _progress.StarsOf("b1_n1"), "Ноль звёзд — это провал, узел не пройден");
     }
 
     [Test]
@@ -1750,7 +1759,7 @@ Rename-Item "Assets\Scripts\UI\PrototypeHud.cs.meta" "PrototypeHud.cs.disabled.m
 
 - [ ] **Шаг 9: Запустить тесты**
 
-Ожидаемо: `CampaignRewardsTests` (6) и `CampaignRulesTests` (6) зелёные,
+Ожидаемо: `CampaignRewardsTests` (6) и `CampaignRulesTests` (7) зелёные,
 `MetaProgressionTests` компилируется и проходит.
 
 ---
@@ -2309,11 +2318,12 @@ public class GameRunner : MonoBehaviour
 - [ ] **Шаг 5: Запустить тесты**
 
 Ожидаемо: `NodeOutcomeTests` (3) зелёные, `CampaignAndCombatTests` компилируется
-и проходит. Проект временно не собирается целиком — `GameHud` ссылается на
-удалённые `GameRunner.State`, `StartRun`, `RestartToSelect`. Это чинится в
-задаче 10; чтобы прогнать EditMode-тесты прямо сейчас, временно закомментировать
-создание `GameHud` в `GameBootstrap` и переименовать `Assets/Scripts/UI/GameHud.cs`
-в `GameHud.cs.disabled` вместе с его `.meta`.
+и проходит.
+
+Старый UI уже отключён в задаче 4 (шаг 7), повторно его трогать не нужно —
+`GameHud.cs.disabled` и `PrototypeHud.cs.disabled` удаляются в задаче 11.
+Временная подпорка в `GameRunner.OnPlayerDied` из задачи 4 исчезает здесь
+сама: метод переписывается целиком.
 
 ---
 
@@ -4816,9 +4826,9 @@ Remove-Item "Assets\Scripts\UI\PrototypeHud.cs","Assets\Scripts\UI\PrototypeHud.
 - [ ] **Шаг 5: Прогнать весь набор тестов**
 
 Ожидаемо: проект компилируется целиком, все EditMode-тесты зелёные.
-Ориентир по количеству: 61 прежний (64 минус три удалённых `AwardRun`) плюс
-6 миграции, 8 кампании, 6 звёзд, 6 наград, 6 правил, 5 `BiomeRun`,
-3 исхода, 8 стека экранов, 4 звука, 4 карусели — **117**.
+Ориентир по количеству: 62 прежних (64 минус три удалённых `AwardRun`, плюс
+`RecordBiomeAttempt`) плюс 6 миграции, 8 кампании, 6 звёзд, 6 наград,
+7 правил, 5 `BiomeRun`, 3 исхода, 8 стека экранов, 4 звука, 4 карусели — **119**.
 
 - [ ] **Шаг 6: Ручная проверка в редакторе**
 

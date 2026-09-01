@@ -66,5 +66,8 @@ public class BossData : ScriptableObject
     [Tooltip("Во сколько раз ускоряются атаки оставшихся сегментов за каждый уничтоженный.")]
     public float rageIntervalScalePerKill = 0.82f;
 
+    [Tooltip("Эталонное время боя в секундах. От него считаются звёзды: у босс-уровня нет волн, поэтому парТайм задаётся вручную, а не выводится из расписания спавна.")]
+    public float parTimeSeconds = 70f;
+
     public List<BossSegmentDefinition> segments = new List<BossSegmentDefinition>();
 }

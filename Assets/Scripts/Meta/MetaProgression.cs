@@ -8,23 +8,19 @@ using UnityEngine;
 /// </summary>
 public class MetaProgression : MonoBehaviour
 {
-    // --- Начисление биомассы ---
-    private const float BiomassPerKill = 0.5f;
-    private const int BiomassPerLevel = 15;
-    private const int BiomassPerBoss = 60;
-
     /// <summary>
     /// Калибровка «жадности» из dev-plan.md: дроп за забег снижен примерно на треть
     /// от щедрого базового значения (целевой уровень 6-7 из 10). Вынесено отдельной
     /// константой, потому что это первое, что будут крутить по данным софт-лонча.
+    /// Публичная: на неё ссылается расчёт награды за узел.
     /// </summary>
-    private const float GreedMultiplier = 0.65f;
+    public const float GreedMultiplier = 0.65f;
 
     public PlayerProgress Progress { get; private set; }
     public IReadOnlyList<PermanentUpgrade> Upgrades => _upgrades;
 
-    /// Сколько биомассы принёс последний забег — для экрана результатов.
-    public int LastRunReward { get; private set; }
+    /// Что принёс последний пройденный узел — для экрана результата.
+    public Reward LastNodeReward { get; private set; }
 
     private readonly List<PermanentUpgrade> _upgrades = new List<PermanentUpgrade>();
     private IProgressStore _store;
@@ -59,23 +55,35 @@ public class MetaProgression : MonoBehaviour
 
     // --- Валюта ---
 
-    /// <summary>Начислить награду за забег и сохранить прогресс.</summary>
-    public int AwardRun(int kills, int levelsCleared, int bossesDefeated)
+    /// <summary>
+    /// Начислить награду за пройденный узел и сохранить прогресс.
+    /// Сохранение идёт здесь, до показа результата: по dev-plan.md прогресс
+    /// обязан быть на диске раньше, чем игроку что-либо предложат
+    /// (в Фазе 4 — просмотр рекламы за удвоение).
+    /// </summary>
+    public Reward AwardNode(CampaignNode node, int previousStars, int newStars)
     {
-        float raw = kills * BiomassPerKill
-                    + levelsCleared * BiomassPerLevel
-                    + bossesDefeated * BiomassPerBoss;
+        Reward payout = CampaignRewards.Payout(node, previousStars, newStars).Scale(GreedMultiplier);
 
-        LastRunReward = Mathf.Max(0, Mathf.RoundToInt(raw * GreedMultiplier));
+        LastNodeReward = payout;
+        Progress.gold += payout.Gold;
+        Progress.biomass += payout.Biomass;
 
-        Progress.biomass += LastRunReward;
-        Progress.totalRuns++;
-        Progress.totalKills += kills;
-        Progress.bossesDefeated += bossesDefeated;
-        Progress.bestLevelReached = Mathf.Max(Progress.bestLevelReached, levelsCleared);
+        if (node != null && node.IsBoss && previousStars <= 0 && newStars > 0)
+        {
+            Progress.bossesDefeated++;
+        }
 
         Save();
-        return LastRunReward;
+        return payout;
+    }
+
+    /// <summary>Учесть завершённую попытку биома в статистике.</summary>
+    public void RecordBiomeAttempt(int kills)
+    {
+        Progress.totalRuns++;
+        Progress.totalKills += kills;
+        Save();
     }
 
     public bool CanAfford(PermanentUpgrade upgrade)

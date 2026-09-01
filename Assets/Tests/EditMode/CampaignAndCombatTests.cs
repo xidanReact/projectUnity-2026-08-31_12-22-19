@@ -10,10 +10,20 @@ public class CampaignAndCombatTests
 {
     // --- Кампания ---
 
+    private static List<LevelData> LevelsOfFirstBiome()
+    {
+        var levels = new List<LevelData>();
+        foreach (CampaignNode node in CampaignBuilder.Build().Biomes[0].Nodes)
+        {
+            levels.Add(node.Level);
+        }
+        return levels;
+    }
+
     [Test]
     public void BuildBloodstream_СоздаётЗапрошенноеЧислоУровней()
     {
-        List<LevelData> levels = CampaignGenerator.BuildBloodstream(8);
+        List<LevelData> levels = LevelsOfFirstBiome();
 
         Assert.AreEqual(8, levels.Count);
     }
@@ -21,7 +31,7 @@ public class CampaignAndCombatTests
     [Test]
     public void BuildBloodstream_ЗакрываетБиомБоссом()
     {
-        List<LevelData> levels = CampaignGenerator.BuildBloodstream(8);
+        List<LevelData> levels = LevelsOfFirstBiome();
         LevelData last = levels[levels.Count - 1];
 
         Assert.AreEqual(AdvanceType.Boss, last.advanceType);
@@ -32,7 +42,7 @@ public class CampaignAndCombatTests
     [Test]
     public void BuildBloodstream_ЧередуетВолныИСегменты()
     {
-        List<LevelData> levels = CampaignGenerator.BuildBloodstream(8);
+        List<LevelData> levels = LevelsOfFirstBiome();
 
         Assert.AreEqual(AdvanceType.Waves, levels[0].advanceType);
         Assert.AreEqual(AdvanceType.Segments, levels[1].advanceType);
@@ -42,7 +52,7 @@ public class CampaignAndCombatTests
     [Test]
     public void BuildBloodstream_ВсеБоевыеУровниИмеютВрагов()
     {
-        List<LevelData> levels = CampaignGenerator.BuildBloodstream(8);
+        List<LevelData> levels = LevelsOfFirstBiome();
 
         for (int i = 0; i < levels.Count; i++)
         {
@@ -63,9 +73,10 @@ public class CampaignAndCombatTests
     [Test]
     public void FindFirstBossLevel_НаходитИндексБосса()
     {
-        List<LevelData> levels = CampaignGenerator.BuildBloodstream(8);
+        List<LevelData> levels = LevelsOfFirstBiome();
 
-        Assert.AreEqual(7, CampaignGenerator.FindFirstBossLevel(levels));
+        Assert.AreEqual(7, CampaignBuilder.BloodstreamNodes - 1, "Босс — последний узел биома");
+        Assert.IsTrue(levels[levels.Count - 1].advanceType == AdvanceType.Boss);
     }
 
     [Test]

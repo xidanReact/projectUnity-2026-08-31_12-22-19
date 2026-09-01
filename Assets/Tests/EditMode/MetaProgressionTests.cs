@@ -34,33 +34,13 @@ public class MetaProgressionTests
     }
 
     [Test]
-    public void AwardRun_НачисляетПоФормулеСоСрезомЖадности()
+    public void RecordBiomeAttempt_СчитаетПопыткиИУбийства()
     {
-        // 10 убийств * 0.5 + 3 уровня * 15 + 1 босс * 60 = 110; 110 * 0.65 = 71.5 -> 72
-        int reward = _meta.AwardRun(kills: 10, levelsCleared: 3, bossesDefeated: 1);
+        _meta.RecordBiomeAttempt(kills: 40);
+        _meta.RecordBiomeAttempt(kills: 15);
 
-        Assert.AreEqual(72, reward);
-        Assert.AreEqual(72, _meta.Progress.biomass);
-    }
-
-    [Test]
-    public void AwardRun_ОбновляетСтатистикуИСохраняет()
-    {
-        _meta.AwardRun(kills: 4, levelsCleared: 2, bossesDefeated: 0);
-
-        Assert.AreEqual(1, _meta.Progress.totalRuns);
-        Assert.AreEqual(4, _meta.Progress.totalKills);
-        Assert.AreEqual(2, _meta.Progress.bestLevelReached);
-        Assert.GreaterOrEqual(_store.SaveCalls, 1, "Прогресс обязан лечь на диск до экрана результатов");
-    }
-
-    [Test]
-    public void AwardRun_НеУхудшаетЛучшийРезультат()
-    {
-        _meta.AwardRun(kills: 0, levelsCleared: 7, bossesDefeated: 0);
-        _meta.AwardRun(kills: 0, levelsCleared: 2, bossesDefeated: 0);
-
-        Assert.AreEqual(7, _meta.Progress.bestLevelReached);
+        Assert.AreEqual(2, _meta.Progress.totalRuns);
+        Assert.AreEqual(55, _meta.Progress.totalKills);
     }
 
     [Test]
