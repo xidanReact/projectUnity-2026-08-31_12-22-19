@@ -17,6 +17,14 @@ public static class StarRating
     /// в деление на ноль и выдавал бы одну звезду при любом результате.
     private const float MinimumParTime = 5f;
 
+    /// Допуск на погрешность float ровно на границе порога: парТайм — это сумма
+    /// накопленных сложений и умножений (интервалы, количество врагов), поэтому
+    /// даже при математически точном совпадении с порогом набегает погрешность
+    /// в младших разрядах, и сравнение «<=» может уйти не в ту сторону. Порог
+    /// должен засчитываться как пройденный «ровно на границе», а не срываться
+    /// на звезду ниже из-за этой погрешности.
+    private const float ThresholdTolerance = 0.001f;
+
     public static float ParTime(CampaignNode node)
     {
         if (node == null || node.Level == null)
@@ -53,11 +61,11 @@ public static class StarRating
     {
         float par = ParTime(node);
 
-        if (elapsedSeconds <= par * ThreeStarFactor)
+        if (elapsedSeconds <= par * ThreeStarFactor + ThresholdTolerance)
         {
             return 3;
         }
 
-        return elapsedSeconds <= par * TwoStarFactor ? 2 : 1;
+        return elapsedSeconds <= par * TwoStarFactor + ThresholdTolerance ? 2 : 1;
     }
 }

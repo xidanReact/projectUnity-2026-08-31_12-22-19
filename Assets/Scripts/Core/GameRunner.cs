@@ -1,81 +1,63 @@
-﻿using System.Collections.Generic;
+using System;
 using UnityEngine;
 
-public enum GameState
+/// <summary>
+/// Результат прохождения узла. Звёзды считаются здесь, а не на экране:
+/// правило «за провал ноль» не должно зависеть от того, кто рисует результат.
+/// </summary>
+public readonly struct NodeOutcome
 {
-    /// Экран выбора патогена — вход в забег.
-    PathogenSelect,
+    public readonly CampaignNode Node;
+    public readonly bool Cleared;
+    public readonly float ElapsedSeconds;
+    public readonly int Kills;
 
-    /// Идёт бой.
-    Playing,
+    public NodeOutcome(CampaignNode node, bool cleared, float elapsedSeconds, int kills)
+    {
+        Node = node;
+        Cleared = cleared;
+        ElapsedSeconds = elapsedSeconds;
+        Kills = kills;
+    }
 
-    /// Уровень зачищен, игрок выбирает 1 из 3 апгрейдов (игра на паузе).
-    UpgradeChoice,
-
-    /// Патоген уничтожен.
-    GameOver
+    public int Stars => Cleared ? StarRating.Evaluate(Node, ElapsedSeconds) : 0;
 }
 
 /// <summary>
-/// Машина состояний забега: выбор патогена → уровень → выбор апгрейда → следующий уровень.
-/// Держит вместе всё остальное (арена, пулы, спавнер, сложность, апгрейды),
-/// чтобы у систем не было ссылок друг на друга напрямую.
+/// Бой одного узла кампании: создать игрока, запустить уровень, дождаться
+/// победы или смерти, отдать исход. Ничего не знает ни про карту, ни про
+/// апгрейды, ни про метапрогрессию — этим управляет AppFlow.
 /// </summary>
 public class GameRunner : MonoBehaviour
 {
-    public GameState State { get; private set; } = GameState.PathogenSelect;
+    public event Action<NodeOutcome> NodeFinished;
+
+    public bool IsRunning { get; private set; }
+    public CampaignNode CurrentNode { get; private set; }
     public PlayerController Player { get; private set; }
-    public PlayerStats Stats { get; private set; }
-    public LevelData CurrentLevel { get; private set; }
+    public PlayerStats Stats => _run != null ? _run.Stats : null;
 
-    /// Сквозной номер уровня в забеге (не сбрасывается при зацикливании списка).
-    public int LevelNumber { get; private set; }
-
-    public int TotalKills { get; private set; }
-
-    /// Индекс босс-уровня в биоме — отладочный вход «сразу к боссу» из HUD.
-    public int FirstBossLevelIndex { get; private set; }
-    public IReadOnlyList<UpgradeDefinition> PendingUpgrades => _pendingUpgrades;
+    /// <summary>
+    /// Время внутри узла. Копится по deltaTime, а не по Time.time: при паузе
+    /// timeScale уходит в ноль, и разница таймстампов начислила бы игроку
+    /// секунды, которые он не играл.
+    /// </summary>
+    public float ElapsedSeconds { get; private set; }
 
     private PoolHub _pools;
     private EnemySpawner _spawner;
     private DifficultyDirector _difficulty;
-    private UpgradeSystem _upgrades;
-    private MetaProgression _meta;
-
-    /// Сколько боссов повержено за текущий забег — идёт в награду биомассой.
-    private int _bossesDefeatedThisRun;
-
-    private List<LevelData> _levels;
-    private List<UpgradeDefinition> _pendingUpgrades = new List<UpgradeDefinition>();
+    private BiomeRun _run;
     private GameObject _playerObject;
 
-    public void Initialize(
-        PoolHub pools,
-        EnemySpawner spawner,
-        DifficultyDirector difficulty,
-        UpgradeSystem upgrades,
-        MetaProgression meta)
+    public void Initialize(PoolHub pools, EnemySpawner spawner, DifficultyDirector difficulty)
     {
         _pools = pools;
         _spawner = spawner;
         _difficulty = difficulty;
-        _upgrades = upgrades;
-        _meta = meta;
 
-        // Временная подпорка задачи 2: CampaignGenerator удалён, а полноценный переход
-        // на карту биомов (GameRunner работает с CampaignNode, а не List<LevelData>)
-        // приходит в задаче 6. До неё берём уровни первого биома как плоский список.
-        _levels = new List<LevelData>();
-        foreach (CampaignNode node in CampaignBuilder.Build().Biomes[0].Nodes)
-        {
-            _levels.Add(node.Level);
-        }
-        FirstBossLevelIndex = _levels.Count - 1;
         _spawner.Initialize(_difficulty);
         _spawner.LevelCleared += OnLevelCleared;
-
-        State = GameState.PathogenSelect;
     }
 
     private void OnDestroy()
@@ -84,135 +66,98 @@ public class GameRunner : MonoBehaviour
         {
             _spawner.LevelCleared -= OnLevelCleared;
         }
+
         Time.timeScale = 1f;
     }
 
-    // --- Забег ---
-
-    public void StartRun(PathogenType type)
+    private void Update()
     {
-        StartRun(PathogenData.CreateDefault(type));
+        if (IsRunning)
+        {
+            ElapsedSeconds += Time.deltaTime;
+        }
     }
 
-    /// <param name="startLevel">С какого уровня биома начать. Не ноль — только для отладки.</param>
-    public void StartRun(PathogenData data, int startLevel = 0)
-    {
-        Stats = new PlayerStats(data);
+    // --- Узел ---
 
-        // Перманентные улучшения ложатся на стартовые статы до создания игрока:
-        // здоровье конфигурируется из Stats.MaxHealth и позже уже не пересчитывается.
-        if (_meta != null)
+    public void StartNode(CampaignNode node, BiomeRun run)
+    {
+        if (node == null || run == null)
         {
-            _meta.ApplyTo(Stats);
+            return;
         }
 
-        _bossesDefeatedThisRun = 0;
-        _difficulty.ResetRun();
-        _upgrades.ResetRun();
-        TotalKills = 0;
-        LevelNumber = Mathf.Max(0, startLevel);
+        CurrentNode = node;
+        _run = run;
+        ElapsedSeconds = 0f;
 
-        SpawnPlayer(data);
-        StartLevel();
+        Time.timeScale = 1f;
+        _pools.ClearBattlefield();
+
+        // Сложность растёт с номером узла в биоме — сквозного счётчика забега
+        // больше нет, и уровень давления теперь однозначно задан узлом карты.
+        // Эскалация внутри узла начинается с нуля: узел — законченный бой,
+        // а не отрезок бесконечного забега.
+        _difficulty.ResetRun();
+        _difficulty.SetLevel(node.IndexInBiome);
+        _difficulty.SetRunning(true);
+
+        SpawnPlayer();
+
+        Player.ResetToLane();
+        SetCombatActive(true);
+        Player.Ability.OnLevelStarted();
+
+        _spawner.StartLevel(node.Level);
+        IsRunning = true;
     }
 
-    public void RestartToSelect()
+    /// <summary>Выйти из узла без исхода — используется при выходе из биома.</summary>
+    public void AbortNode()
     {
+        if (!IsRunning && _playerObject == null)
+        {
+            return;
+        }
+
+        IsRunning = false;
         Time.timeScale = 1f;
         _spawner.StopLevel();
         _pools.ClearBattlefield();
-        DestroyPlayer();
         _difficulty.SetRunning(false);
-        State = GameState.PathogenSelect;
-    }
-
-    private void StartLevel()
-    {
-        Time.timeScale = 1f;
-
-        // Список уровней биома короткий — после последнего идём по кругу,
-        // а рост сложности обеспечивает сквозной LevelNumber.
-        CurrentLevel = _levels[LevelNumber % _levels.Count];
-
-        _pools.ClearBattlefield();
-        _difficulty.SetLevel(LevelNumber);
-        _difficulty.SetRunning(true);
-
-        Player.ResetToLane();
-        Player.SetInputEnabled(true);
-        Player.GetComponent<PlayerWeapon>().SetEnabled(true);
-        Player.Ability.OnLevelStarted();
-
-        _spawner.StartLevel(CurrentLevel);
-        State = GameState.Playing;
+        DestroyPlayer();
+        CurrentNode = null;
+        _run = null;
     }
 
     private void OnLevelCleared()
     {
-        if (State != GameState.Playing)
-        {
-            return;
-        }
-
-        TotalKills += _spawner.Kills;
-
-        if (CurrentLevel != null && CurrentLevel.advanceType == AdvanceType.Boss)
-        {
-            _bossesDefeatedThisRun++;
-        }
-
-        _pools.ClearBattlefield();
-        SetCombatActive(false);
-
-        _pendingUpgrades = _upgrades.Roll(Stats, LevelNumber);
-        if (_pendingUpgrades.Count == 0)
-        {
-            // Все апгрейды выбраны до потолка — просто идём дальше.
-            LevelNumber++;
-            StartLevel();
-            return;
-        }
-
-        State = GameState.UpgradeChoice;
-        Time.timeScale = 0f;
-    }
-
-    public void ChooseUpgrade(UpgradeDefinition upgrade)
-    {
-        if (State != GameState.UpgradeChoice)
-        {
-            return;
-        }
-
-        _upgrades.Take(upgrade, Stats, Player);
-        _pendingUpgrades.Clear();
-
-        LevelNumber++;
-        StartLevel();
+        Finish(cleared: true);
     }
 
     private void OnPlayerDied()
     {
-        if (State == GameState.GameOver)
+        Finish(cleared: false);
+    }
+
+    private void Finish(bool cleared)
+    {
+        if (!IsRunning)
         {
             return;
         }
 
-        TotalKills += _spawner.Kills;
+        IsRunning = false;
+
+        int kills = _spawner.Kills;
+        CampaignNode node = CurrentNode;
+
         _spawner.StopLevel();
         _pools.ClearBattlefield();
-        SetCombatActive(false);
         _difficulty.SetRunning(false);
+        SetCombatActive(false);
 
-        // Награда начисляется и сохраняется здесь, до показа экрана результатов:
-        // по dev-plan.md прогресс должен быть на диске раньше, чем игроку
-        // предложат что-либо (в Фазе 4 — просмотр рекламы за удвоение).
-        if (_meta != null)
-        {
-            _meta.AwardRun(TotalKills, LevelNumber, _bossesDefeatedThisRun);
-        }
-
-        State = GameState.GameOver;
+        NodeFinished?.Invoke(new NodeOutcome(node, cleared, ElapsedSeconds, kills));
     }
 
     private void SetCombatActive(bool active)
@@ -232,7 +177,11 @@ public class GameRunner : MonoBehaviour
 
     // --- Игрок ---
 
-    private void SpawnPlayer(PathogenData data)
+    /// <summary>
+    /// Игрок пересоздаётся на каждый узел, но статы берутся из BiomeRun —
+    /// поэтому апгрейды, взятые на прошлых узлах, остаются в силе.
+    /// </summary>
+    private void SpawnPlayer()
     {
         DestroyPlayer();
 
@@ -246,13 +195,13 @@ public class GameRunner : MonoBehaviour
         var weapon = _playerObject.AddComponent<PlayerWeapon>();
         var mutations = _playerObject.AddComponent<PlayerMutations>();
         var reduction = _playerObject.AddComponent<DamageReduction>();
-        PathogenAbility ability = AddAbility(_playerObject, data.type);
+        PathogenAbility ability = AddAbility(_playerObject, _run.Pathogen.type);
 
-        reduction.Initialize(Stats);
-        mutations.Initialize(Stats, health);
-        ability.Initialize(Stats);
-        player.Initialize(Stats, ability, mutations);
-        weapon.Initialize(Stats, ability, mutations);
+        reduction.Initialize(_run.Stats);
+        mutations.Initialize(_run.Stats, health);
+        ability.Initialize(_run.Stats);
+        player.Initialize(_run.Stats, ability, mutations);
+        weapon.Initialize(_run.Stats, ability, mutations);
         health.Died += OnPlayerDied;
 
         Player = player;

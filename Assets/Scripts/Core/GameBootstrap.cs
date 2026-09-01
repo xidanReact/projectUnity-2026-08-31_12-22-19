@@ -59,21 +59,26 @@ public class GameBootstrap : MonoBehaviour
         Debug.Log($"[Meta] Файл прогресса: {store.FilePath}");
         meta.Initialize(store);
 
-        runner.Initialize(pools, spawner, difficulty, upgrades, meta);
+        // Запуск узла кампании (BiomeRun, апгрейды, метапрогрессия) придёт
+        // вместе с AppFlow в задаче 11 — пока GameRunner ничего не запускает.
+        runner.Initialize(pools, spawner, difficulty);
 
-        if (useLegacyImguiHud)
-        {
-            var legacy = gameObjectRoot.AddComponent<PrototypeHud>();
-            legacy.runner = runner;
-            legacy.spawner = spawner;
-            legacy.upgrades = upgrades;
-            legacy.meta = meta;
-        }
-        else
-        {
-            var hud = gameObjectRoot.AddComponent<GameHud>();
-            hud.Initialize(runner, spawner, upgrades, meta);
-        }
+        // Старый UI отключён вместе с GameHud/PrototypeHud (см. .cs.disabled):
+        // AwardRun, на который они опирались, исчез вместе с бесконечным
+        // забегом. Интерфейса не будет до задачи 11.
+        // if (useLegacyImguiHud)
+        // {
+        //     var legacy = gameObjectRoot.AddComponent<PrototypeHud>();
+        //     legacy.runner = runner;
+        //     legacy.spawner = spawner;
+        //     legacy.upgrades = upgrades;
+        //     legacy.meta = meta;
+        // }
+        // else
+        // {
+        //     var hud = gameObjectRoot.AddComponent<GameHud>();
+        //     hud.Initialize(runner, spawner, upgrades, meta);
+        // }
     }
 
     private static void SetUpCamera()
