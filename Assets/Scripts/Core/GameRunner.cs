@@ -23,10 +23,6 @@ public enum GameState
 /// </summary>
 public class GameRunner : MonoBehaviour
 {
-    [Header("Кампания")]
-    [Tooltip("Сколько уровней Биома 1 генерировать. После последнего список идёт по кругу, но сложность продолжает расти.")]
-    public int levelsInBiome = 8;
-
     public GameState State { get; private set; } = GameState.PathogenSelect;
     public PlayerController Player { get; private set; }
     public PlayerStats Stats { get; private set; }
@@ -69,7 +65,7 @@ public class GameRunner : MonoBehaviour
 
         // Временная подпорка задачи 2: CampaignGenerator удалён, а полноценный переход
         // на карту биомов (GameRunner работает с CampaignNode, а не List<LevelData>)
-        // приходит в задаче 7. До неё берём уровни первого биома как плоский список.
+        // приходит в задаче 6. До неё берём уровни первого биома как плоский список.
         _levels = new List<LevelData>();
         foreach (CampaignNode node in CampaignBuilder.Build().Biomes[0].Nodes)
         {

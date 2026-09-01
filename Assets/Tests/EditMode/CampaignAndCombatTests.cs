@@ -12,7 +12,7 @@ public class CampaignAndCombatTests
 
     // Временная подпорка задачи 2: CampaignGenerator удалён, тесты берут уровни
     // из CampaignBuilder — постоянного потребителя (карта, а не плоский список)
-    // добавит задача 7.
+    // добавит задача 6.
     private static List<LevelData> BuildBloodstreamLevels()
     {
         var levels = new List<LevelData>();
