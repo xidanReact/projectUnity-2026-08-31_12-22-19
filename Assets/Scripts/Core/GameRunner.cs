@@ -67,8 +67,15 @@ public class GameRunner : MonoBehaviour
         _upgrades = upgrades;
         _meta = meta;
 
-        _levels = CampaignGenerator.BuildBloodstream(levelsInBiome);
-        FirstBossLevelIndex = CampaignGenerator.FindFirstBossLevel(_levels);
+        // Временная подпорка задачи 2: CampaignGenerator удалён, а полноценный переход
+        // на карту биомов (GameRunner работает с CampaignNode, а не List<LevelData>)
+        // приходит в задаче 7. До неё берём уровни первого биома как плоский список.
+        _levels = new List<LevelData>();
+        foreach (CampaignNode node in CampaignBuilder.Build().Biomes[0].Nodes)
+        {
+            _levels.Add(node.Level);
+        }
+        FirstBossLevelIndex = _levels.Count - 1;
         _spawner.Initialize(_difficulty);
         _spawner.LevelCleared += OnLevelCleared;
 

@@ -10,10 +10,23 @@ public class CampaignAndCombatTests
 {
     // --- Кампания ---
 
+    // Временная подпорка задачи 2: CampaignGenerator удалён, тесты берут уровни
+    // из CampaignBuilder — постоянного потребителя (карта, а не плоский список)
+    // добавит задача 7.
+    private static List<LevelData> BuildBloodstreamLevels()
+    {
+        var levels = new List<LevelData>();
+        foreach (CampaignNode node in CampaignBuilder.Build().Biomes[0].Nodes)
+        {
+            levels.Add(node.Level);
+        }
+        return levels;
+    }
+
     [Test]
     public void BuildBloodstream_СоздаётЗапрошенноеЧислоУровней()
     {
-        List<LevelData> levels = CampaignGenerator.BuildBloodstream(8);
+        List<LevelData> levels = BuildBloodstreamLevels();
 
         Assert.AreEqual(8, levels.Count);
     }
@@ -21,7 +34,7 @@ public class CampaignAndCombatTests
     [Test]
     public void BuildBloodstream_ЗакрываетБиомБоссом()
     {
-        List<LevelData> levels = CampaignGenerator.BuildBloodstream(8);
+        List<LevelData> levels = BuildBloodstreamLevels();
         LevelData last = levels[levels.Count - 1];
 
         Assert.AreEqual(AdvanceType.Boss, last.advanceType);
@@ -32,7 +45,7 @@ public class CampaignAndCombatTests
     [Test]
     public void BuildBloodstream_ЧередуетВолныИСегменты()
     {
-        List<LevelData> levels = CampaignGenerator.BuildBloodstream(8);
+        List<LevelData> levels = BuildBloodstreamLevels();
 
         Assert.AreEqual(AdvanceType.Waves, levels[0].advanceType);
         Assert.AreEqual(AdvanceType.Segments, levels[1].advanceType);
@@ -42,7 +55,7 @@ public class CampaignAndCombatTests
     [Test]
     public void BuildBloodstream_ВсеБоевыеУровниИмеютВрагов()
     {
-        List<LevelData> levels = CampaignGenerator.BuildBloodstream(8);
+        List<LevelData> levels = BuildBloodstreamLevels();
 
         for (int i = 0; i < levels.Count; i++)
         {
@@ -63,9 +76,19 @@ public class CampaignAndCombatTests
     [Test]
     public void FindFirstBossLevel_НаходитИндексБосса()
     {
-        List<LevelData> levels = CampaignGenerator.BuildBloodstream(8);
+        List<LevelData> levels = BuildBloodstreamLevels();
 
-        Assert.AreEqual(7, CampaignGenerator.FindFirstBossLevel(levels));
+        int firstBoss = -1;
+        for (int i = 0; i < levels.Count; i++)
+        {
+            if (levels[i].advanceType == AdvanceType.Boss)
+            {
+                firstBoss = i;
+                break;
+            }
+        }
+
+        Assert.AreEqual(7, firstBoss);
     }
 
     [Test]
